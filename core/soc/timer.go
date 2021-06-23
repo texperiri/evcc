@@ -53,14 +53,15 @@ func (lp *Timer) Reset() {
 	lp.SoC = 0
 }
 
-// StartRequired calculates remaining charge duration and returns true if charge start is required to achieve target soc in time
-func (lp *Timer) StartRequired() bool {
+// DemandActive calculates remaining charge duration and returns true if charge start is required to achieve target soc in time
+func (lp *Timer) DemandActive() bool {
 	if lp == nil {
 		return false
 	}
 
 	se := lp.SocEstimator()
 	if !lp.active() || se == nil {
+		lp.log.TRACE.Printf("target charging: not active")
 		return false
 	}
 
@@ -71,7 +72,14 @@ func (lp *Timer) StartRequired() bool {
 	lp.finishAt = time.Now().Add(remainingDuration).Round(time.Minute)
 	lp.log.DEBUG.Printf("target charging active for %v: projected %v (%v remaining)", lp.Time, lp.finishAt, remainingDuration.Round(time.Minute))
 
-	lp.chargeRequired = lp.finishAt.After(lp.Time)
+	if !lp.chargeRequired {
+		// first time starting
+		lp.chargeRequired = lp.finishAt.After(lp.Time)
+	} else {
+		// continued charging - disable deactivation
+		lp.chargeRequired = lp.finishAt.After(lp.Time.Add(-deviation))
+	}
+
 	lp.Publish("timerActive", lp.chargeRequired)
 
 	return lp.chargeRequired
@@ -84,6 +92,7 @@ func (lp *Timer) active() bool {
 
 	// reset active
 	if inactive && lp.chargeRequired {
+		lp.log.TRACE.Printf("target charging: deactivating") // TODO remove
 		lp.chargeRequired = false
 		lp.Publish("timerActive", lp.chargeRequired)
 	}
@@ -93,17 +102,20 @@ func (lp *Timer) active() bool {
 
 // Handle adjusts current up/down to achieve desired target time taking.
 func (lp *Timer) Handle() float64 {
+	action := "steady"
+
 	switch {
 	case lp.finishAt.Before(lp.Time.Add(-deviation)):
 		lp.current--
-		lp.log.DEBUG.Printf("target charging: slowdown")
+		action = "slowdown"
 
 	case lp.finishAt.After(lp.Time):
 		lp.current++
-		lp.log.DEBUG.Printf("target charging: speedup")
+		action = "speedup"
 	}
 
 	lp.current = math.Max(math.Min(lp.current, float64(lp.maxCurrent)), 0)
+	lp.log.DEBUG.Printf("target charging: %s (%.3gA)", action, lp.current)
 
 	return lp.current
 }
