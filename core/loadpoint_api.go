@@ -13,8 +13,6 @@ type LoadpointController interface {
 	LoadpointControl(loadpoint.API)
 }
 
-type LoadPointAPI = loadpoint.API
-
 var _ loadpoint.API = (*LoadPoint)(nil)
 
 // GetStatus returns the charging status
