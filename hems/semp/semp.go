@@ -14,6 +14,7 @@ import (
 
 	"github.com/andig/evcc/api"
 	"github.com/andig/evcc/core"
+	"github.com/andig/evcc/core/loadpoint"
 	"github.com/andig/evcc/server"
 	"github.com/andig/evcc/util"
 	"github.com/denisbrodbeck/machineid"
@@ -514,9 +515,9 @@ func (s *SEMP) deviceControlHandler(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
-			demand := core.RemoteSoftDisable
+			demand := loadpoint.RemoteSoftDisable
 			if dev.On {
-				demand = core.RemoteEnable
+				demand = loadpoint.RemoteEnable
 			}
 
 			lp.RemoteControl(sempController, demand)

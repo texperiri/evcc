@@ -12,6 +12,7 @@ import (
 
 	"github.com/andig/evcc/api"
 	"github.com/andig/evcc/core"
+	"github.com/andig/evcc/core/loadpoint"
 	"github.com/andig/evcc/util"
 	"github.com/andig/evcc/util/test"
 	"github.com/gorilla/handlers"
@@ -234,7 +235,7 @@ func MinSoCHandler(loadpoint core.LoadPointAPI) http.HandlerFunc {
 }
 
 // RemoteDemandHandler updates minimum soc
-func RemoteDemandHandler(loadpoint core.LoadPointAPI) http.HandlerFunc {
+func RemoteDemandHandler(lp core.LoadPointAPI) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 
@@ -245,18 +246,18 @@ func RemoteDemandHandler(loadpoint core.LoadPointAPI) http.HandlerFunc {
 			source, ok = vars["source"]
 		}
 
-		demand, err := core.RemoteDemandString(demandS)
+		demand, err := loadpoint.RemoteDemandString(demandS)
 
 		if !ok || err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
 
-		loadpoint.RemoteControl(source, demand)
+		lp.RemoteControl(source, demand)
 
 		res := struct {
-			Demand core.RemoteDemand `json:"demand"`
-			Source string            `json:"source"`
+			Demand loadpoint.RemoteDemand `json:"demand"`
+			Source string                 `json:"source"`
 		}{
 			Source: source,
 			Demand: demand,
