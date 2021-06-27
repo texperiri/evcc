@@ -1034,7 +1034,7 @@ func (lp *LoadPoint) Update(sitePower float64) {
 	// target charging
 	case lp.socTimer.DemandActive():
 		targetCurrent := lp.socTimer.Handle()
-		err = lp.setLimit(targetCurrent, false)
+		err = lp.setLimit(targetCurrent, true)
 
 	case mode == api.ModeMinPV || mode == api.ModePV:
 		targetCurrent := lp.pvMaxCurrent(mode, sitePower)

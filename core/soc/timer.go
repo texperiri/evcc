@@ -50,12 +50,29 @@ func (lp *Timer) DemandActive() bool {
 		return false
 	}
 
+	se := lp.SocEstimator()
+	if se == nil {
+		lp.log.WARN.Printf("target charging: not possible")
+		return false
+	}
+
 	defer func() {
 		lp.Publish("timerSet", lp.Time.After(time.Now()))
 		lp.Publish("timerActive", lp.active)
+		lp.Publish("timerProjectedEnd", lp.finishAt)
 	}()
 
-	// timer charging is already active
+	// power
+	power := lp.GetMaxPower()
+	if lp.active {
+		power *= lp.current / lp.GetMaxCurrent()
+	}
+
+	// time
+	remainingDuration := se.RemainingChargeDuration(power, lp.SoC)
+	lp.finishAt = time.Now().Add(remainingDuration).Round(time.Minute)
+
+	// timer charging is already active- only deactivate once charging has stopped
 	if lp.active {
 		if time.Now().After(lp.Time) && lp.GetStatus() != api.StatusC {
 			lp.log.TRACE.Printf("target charging: deactivating")
@@ -65,17 +82,9 @@ func (lp *Timer) DemandActive() bool {
 		return lp.active
 	}
 
-	se := lp.SocEstimator()
-	if se == nil {
-		lp.log.TRACE.Printf("target charging: not possible")
-		return false
-	}
-
-	// time
-	remainingDuration := se.RemainingChargeDuration(lp.GetMaxPower(), lp.SoC)
-	lp.finishAt = time.Now().Add(remainingDuration).Round(time.Minute)
-
+	// check if charging need be activated
 	if lp.active = lp.finishAt.After(lp.Time); lp.active {
+		lp.current = lp.GetMaxCurrent()
 		lp.log.DEBUG.Printf("target charging active for %v: projected %v (%v remaining)", lp.Time, lp.finishAt, remainingDuration.Round(time.Minute))
 	}
 
