@@ -28,6 +28,7 @@ type Easee struct {
 	lastChargeMode    api.ChargeMode
 	log               *util.Logger
 	phases            int
+	current           float64
 }
 
 func init() {
@@ -282,20 +283,24 @@ func (c *Easee) MaxCurrentMillis(current float64) error {
 		c.updated = time.Time{} // clear cache
 	}
 
+	if err == nil {
+		c.current = current
+	}
+
 	return err
 }
 
 var _ api.ChargePhases = (*Easee)(nil)
 
-// Phases1p3p implements the api.ChargePhases interface.
+// Phases1p3p implements the api.ChargePhases interface
 func (c *Easee) Phases1p3p(phases int) error {
 	c.phases = phases
-	return nil
+	return c.MaxCurrentMillis(c.current)
 }
 
 var _ api.Meter = (*Easee)(nil)
 
-// CurrentPower implements the api.Meter interface.
+// CurrentPower implements the api.Meter interface
 func (c *Easee) CurrentPower() (float64, error) {
 	res, err := c.state()
 	return 1e3 * res.TotalPower, err
