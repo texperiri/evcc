@@ -397,7 +397,8 @@ func (lp *LoadPoint) Prepare(uiChan chan<- util.Param, pushChan chan<- push.Even
 	lp.pushChan = pushChan
 	lp.lpChan = lpChan
 
-	lp.activePhases = lp.activePhases
+	// assume all phases are active
+	lp.activePhases = lp.Phases
 
 	// event handlers
 	_ = lp.bus.Subscribe(evChargeStart, lp.evChargeStartHandler)
