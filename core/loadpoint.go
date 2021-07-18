@@ -410,7 +410,7 @@ func (lp *LoadPoint) Prepare(uiChan chan<- util.Param, pushChan chan<- push.Even
 	lp.publish("title", lp.Title)
 	lp.publish("minCurrent", lp.MinCurrent)
 	lp.publish("maxCurrent", lp.MaxCurrent)
-	lp.publish("phases", lp.activePhases)
+	lp.publish("phases", lp.Phases)
 	lp.publish("activePhases", lp.activePhases)
 	lp.publish("hasVehicle", len(lp.vehicles) > 0)
 
@@ -777,6 +777,7 @@ func (lp *LoadPoint) scalePhases(phases int, availablePower float64) float64 {
 	if cp, ok := lp.charger.(api.ChargePhases); lp.Phases != int64(phases) && ok {
 		if err := cp.Phases1p3p(phases); err == nil {
 			lp.Phases = int64(phases)
+			lp.publish("phases", lp.Phases)
 
 			targetCurrent := powerToCurrent(availablePower, int64(phases))
 			lp.log.INFO.Printf("switched phases to %d, max charge current: %.1fA", phases, targetCurrent)
