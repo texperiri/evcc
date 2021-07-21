@@ -21,6 +21,7 @@ type OpenWB struct {
 	currentPowerG func() (float64, error)
 	totalEnergyG  func() (float64, error)
 	currentsG     []func() (float64, error)
+	phasesS       func(int64) error
 }
 
 // NewOpenWBFromConfig creates a new configurable charger
@@ -85,18 +86,18 @@ func NewOpenWB(log *util.Logger, mqttconf mqtt.Config, id int, topic string, tim
 	}
 
 	// adapt plugged/charging to status
-	plugged := boolG(fmt.Sprintf("%s/lp/%d/%s", topic, id, openwb.PluggedTopic))
-	charging := boolG(fmt.Sprintf("%s/lp/%d/%s", topic, id, openwb.ChargingTopic))
-	status := provider.NewOpenWBStatusProvider(plugged, charging).StringGetter
+	pluggedG := boolG(fmt.Sprintf("%s/lp/%d/%s", topic, id, openwb.PluggedTopic))
+	chargingG := boolG(fmt.Sprintf("%s/lp/%d/%s", topic, id, openwb.ChargingTopic))
+	statusG := provider.NewOpenWBStatusProvider(pluggedG, chargingG).StringGetter
 
 	// remaining getters
-	enabled := boolG(fmt.Sprintf("%s/lp/%d/%s", topic, id, openwb.EnabledTopic))
+	enabledG := boolG(fmt.Sprintf("%s/lp/%d/%s", topic, id, openwb.EnabledTopic))
 
 	// setters
-	enable := provider.NewMqtt(log, client,
+	enableS := provider.NewMqtt(log, client,
 		fmt.Sprintf("%s/set/lp%d/%s", topic, id, openwb.EnabledTopic),
 		1, timeout).BoolSetter("enable")
-	maxcurrent := provider.NewMqtt(log, client,
+	maxcurrentS := provider.NewMqtt(log, client,
 		fmt.Sprintf("%s/set/lp%d/%s", topic, id, openwb.MaxCurrentTopic),
 		1, timeout).IntSetter("maxcurrent")
 
@@ -110,19 +111,26 @@ func NewOpenWB(log *util.Logger, mqttconf mqtt.Config, id int, topic string, tim
 		currentsG = append(currentsG, current)
 	}
 
-	charger, err := NewConfigurable(status, enabled, enable, maxcurrent)
+	charger, err := NewConfigurable(statusG, enabledG, enableS, maxcurrentS)
 	if err != nil {
 		return nil, err
 	}
 
-	res := &OpenWB{
+	// optional capabilities
+	var phasesS func(int64) error
+	phasesS = provider.NewMqtt(log, client,
+		fmt.Sprintf("%s/set/isss/%s", topic, openwb.PhasesTopic),
+		1, timeout).IntSetter("phases")
+
+	c := &OpenWB{
 		Charger:       charger,
 		currentPowerG: currentPowerG,
 		totalEnergyG:  totalEnergyG,
 		currentsG:     currentsG,
+		phasesS:       phasesS,
 	}
 
-	return res, nil
+	return c, nil
 }
 
 var _ api.Meter = (*OpenWB)(nil)
@@ -154,4 +162,9 @@ func (m *OpenWB) Currents() (float64, float64, float64, error) {
 	}
 
 	return currents[0], currents[1], currents[2], nil
+}
+
+// phases implements the api.ChargePhases interface
+func (c *OpenWB) phases(phases int) error {
+	return c.phasesS(int64(phases))
 }
