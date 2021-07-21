@@ -24,6 +24,8 @@ type OpenWB struct {
 	phasesS       func(int64) error
 }
 
+// go:generate go run ../cmd/tools/decorate.go -f decorateOpenWB -b *OpenWB -r api.Charger -t "api.ChargePhases,Phases1p3p,func(int) (error)"
+
 // NewOpenWBFromConfig creates a new configurable charger
 func NewOpenWBFromConfig(other map[string]interface{}) (api.Charger, error) {
 	cc := struct {
@@ -47,7 +49,7 @@ func NewOpenWBFromConfig(other map[string]interface{}) (api.Charger, error) {
 }
 
 // NewOpenWB creates a new configurable charger
-func NewOpenWB(log *util.Logger, mqttconf mqtt.Config, id int, topic string, timeout time.Duration) (*OpenWB, error) {
+func NewOpenWB(log *util.Logger, mqttconf mqtt.Config, id int, topic string, timeout time.Duration) (api.Charger, error) {
 	client, err := mqtt.RegisteredClientOrDefault(log, mqttconf)
 	if err != nil {
 		return nil, err
@@ -118,9 +120,11 @@ func NewOpenWB(log *util.Logger, mqttconf mqtt.Config, id int, topic string, tim
 
 	// optional capabilities
 	var phasesS func(int64) error
-	phasesS = provider.NewMqtt(log, client,
-		fmt.Sprintf("%s/set/isss/%s", topic, openwb.PhasesTopic),
-		1, timeout).IntSetter("phases")
+	if false {
+		phasesS = provider.NewMqtt(log, client,
+			fmt.Sprintf("%s/set/isss/%s", topic, openwb.PhasesTopic),
+			1, timeout).IntSetter("phases")
+	}
 
 	c := &OpenWB{
 		Charger:       charger,
@@ -130,7 +134,7 @@ func NewOpenWB(log *util.Logger, mqttconf mqtt.Config, id int, topic string, tim
 		phasesS:       phasesS,
 	}
 
-	return c, nil
+	return decorateOpenWB(c, c.phases), nil
 }
 
 var _ api.Meter = (*OpenWB)(nil)
