@@ -67,7 +67,7 @@ func (lp *LoadPoint) SetMode(mode api.ChargeMode) {
 		lp.publish("mode", mode)
 
 		// immediately allow pv mode activity
-		lp.pvDisableTimer()
+		lp.elapsePVTimer()
 
 		lp.requestUpdate()
 	}
