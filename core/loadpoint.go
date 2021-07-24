@@ -336,7 +336,7 @@ func (lp *LoadPoint) evVehicleConnectHandler() {
 	lp.findActiveVehicle()
 
 	// immediately allow pv mode activity
-	lp.pvDisableTimer()
+	lp.elapsePVTimer()
 
 	lp.pushEvent(evVehicleConnect)
 }
@@ -766,8 +766,8 @@ func (lp *LoadPoint) effectiveCurrent() float64 {
 	return lp.chargeCurrent
 }
 
-// pvDisableTimer puts the pv enable/disable timer into elapsed state
-func (lp *LoadPoint) pvDisableTimer() {
+// elapsePVTimer puts the pv enable/disable timer into elapsed state
+func (lp *LoadPoint) elapsePVTimer() {
 	lp.pvTimer = time.Now().Add(-lp.Disable.Delay)
 }
 
@@ -791,7 +791,11 @@ func (lp *LoadPoint) scalePhases(phases int, availablePower float64) float64 {
 			targetCurrent := powerToCurrent(availablePower, int64(phases))
 			lp.log.INFO.Printf("switched phases to %d, max charge current: %.1fA", phases, targetCurrent)
 
+			// disable phase timer
 			lp.phaseTimer = time.Time{}
+
+			// allow pv mode to re-enable charger right away
+			lp.elapsePVTimer()
 
 			return targetCurrent
 		} else {
@@ -1151,7 +1155,7 @@ func (lp *LoadPoint) Update(sitePower float64, cheap bool) {
 	case lp.minSocNotReached():
 		_ = lp.scalePhases(3, 0) // 3p if available
 		err = lp.setLimit(lp.GetMaxCurrent(), true)
-		lp.pvDisableTimer() // let PV mode disable immediately afterwards
+		lp.elapsePVTimer() // let PV mode disable immediately afterwards
 
 	case mode == api.ModeNow:
 		_ = lp.scalePhases(3, 0) // 3p if available
