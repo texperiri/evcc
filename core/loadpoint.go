@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"regexp"
 	"strings"
@@ -481,7 +482,7 @@ func (lp *LoadPoint) setLimit(chargeCurrent float64, force bool) (err error) {
 			lp.chargeCurrent = chargeCurrent
 			lp.bus.Publish(evChargeCurrent, chargeCurrent)
 		} else {
-			lp.log.ERROR.Printf("max charge current %.2g: %v", chargeCurrent, err)
+			err = fmt.Errorf("max charge current %.2g: %w", chargeCurrent, err)
 		}
 	}
 
@@ -513,7 +514,7 @@ func (lp *LoadPoint) setLimit(chargeCurrent float64, force bool) (err error) {
 				}
 			}
 		} else {
-			lp.log.ERROR.Printf("charger %s: %v", status[enabled], err)
+			err = fmt.Errorf("charger %s: %w", status[enabled], err)
 		}
 	}
 
@@ -779,7 +780,7 @@ func (lp *LoadPoint) scalePhases(phases int, availablePower float64) float64 {
 	// disable charger - this will also stop the car charging using the api if available
 	if err := lp.setLimit(0, true); err != nil {
 		lp.log.ERROR.Println(err)
-		return powerToCurrent(availablePower, int64(lp.activePhases))
+		return powerToCurrent(availablePower, lp.activePhases)
 	}
 
 	if cp, ok := lp.charger.(api.ChargePhases); lp.Phases != int64(phases) && ok {
