@@ -485,7 +485,7 @@ func (lp *LoadPoint) setLimit(chargeCurrent float64, force bool) (err error) {
 		}
 	}
 
-	// set enabled
+	// set enabled/disabled
 	if enabled := chargeCurrent >= lp.GetMinCurrent(); enabled != lp.enabled && err == nil {
 		if remaining := (lp.GuardDuration - lp.clock.Since(lp.guardUpdated)).Truncate(time.Second); remaining > 0 && !force {
 			lp.log.DEBUG.Printf("charger %s: contactor delay %v", status[enabled], remaining)
@@ -774,6 +774,12 @@ func (lp *LoadPoint) pvDisableTimer() {
 func (lp *LoadPoint) scalePhases(phases int, availablePower float64) float64 {
 	if phases != 1 && phases != 3 {
 		return 0
+	}
+
+	// disable charger - this will also stop the car charging using the api if available
+	if err := lp.setLimit(0, true); err != nil {
+		lp.log.ERROR.Println(err)
+		return powerToCurrent(availablePower, int64(lp.activePhases))
 	}
 
 	if cp, ok := lp.charger.(api.ChargePhases); lp.Phases != int64(phases) && ok {
