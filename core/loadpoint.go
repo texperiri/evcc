@@ -769,6 +769,7 @@ func (lp *LoadPoint) effectiveCurrent() float64 {
 // elapsePVTimer puts the pv enable/disable timer into elapsed state
 func (lp *LoadPoint) elapsePVTimer() {
 	lp.pvTimer = time.Now().Add(-lp.Disable.Delay)
+	lp.guardUpdated = time.Now().Add(-lp.GuardDuration)
 }
 
 // scalePhases adjusts the number of active phases and returns the appropriate charging current
