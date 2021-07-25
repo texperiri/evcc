@@ -790,7 +790,7 @@ func (lp *LoadPoint) scalePhases(phases int, availablePower float64) float64 {
 			lp.publish("phases", lp.Phases)
 
 			targetCurrent := powerToCurrent(availablePower, int64(phases))
-			lp.log.INFO.Printf("switched phases to %d, max charge current: %.1fA", phases, targetCurrent)
+			lp.log.INFO.Printf("switched phases to %d, max charge current: %.1fA for available power %.fW", phases, targetCurrent, availablePower)
 
 			// disable phase timer
 			lp.phaseTimer = time.Time{}
