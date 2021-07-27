@@ -33,6 +33,7 @@ func NewOpenWBFromConfig(other map[string]interface{}) (api.Charger, error) {
 		Topic       string
 		Timeout     time.Duration
 		ID          int
+		Phases      bool
 	}{
 		Topic:   openwb.RootTopic,
 		Timeout: openwb.Timeout,
@@ -45,11 +46,11 @@ func NewOpenWBFromConfig(other map[string]interface{}) (api.Charger, error) {
 
 	log := util.NewLogger("openwb")
 
-	return NewOpenWB(log, cc.Config, cc.ID, cc.Topic, cc.Timeout)
+	return NewOpenWB(log, cc.Config, cc.ID, cc.Topic, cc.Phases, cc.Timeout)
 }
 
 // NewOpenWB creates a new configurable charger
-func NewOpenWB(log *util.Logger, mqttconf mqtt.Config, id int, topic string, timeout time.Duration) (api.Charger, error) {
+func NewOpenWB(log *util.Logger, mqttconf mqtt.Config, id int, topic string, p1p3 bool, timeout time.Duration) (api.Charger, error) {
 	client, err := mqtt.RegisteredClientOrDefault(log, mqttconf)
 	if err != nil {
 		return nil, err
@@ -118,23 +119,23 @@ func NewOpenWB(log *util.Logger, mqttconf mqtt.Config, id int, topic string, tim
 		return nil, err
 	}
 
-	// optional capabilities
-	var phasesS func(int64) error
-	if false {
-		phasesS = provider.NewMqtt(log, client,
-			fmt.Sprintf("%s/set/isss/%s", topic, openwb.PhasesTopic),
-			1, timeout).IntSetter("phases")
-	}
-
 	c := &OpenWB{
 		Charger:       charger,
 		currentPowerG: currentPowerG,
 		totalEnergyG:  totalEnergyG,
 		currentsG:     currentsG,
-		phasesS:       phasesS,
 	}
 
-	return decorateOpenWB(c, c.phases), nil
+	// optional capabilities
+	var phases func(int) error
+	if p1p3 {
+		phases = c.phases
+		c.phasesS = provider.NewMqtt(log, client,
+			fmt.Sprintf("%s/set/isss/%s", topic, openwb.PhasesTopic),
+			1, timeout).IntSetter("phases")
+	}
+
+	return decorateOpenWB(c, phases), nil
 }
 
 var _ api.Meter = (*OpenWB)(nil)
