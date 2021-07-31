@@ -188,7 +188,7 @@ Available charger implementations are:
 - `mcc`: Mobile Charger Connect devices (Audi, Bentley, Porsche)
 - `nrgkick-bluetooth`: NRGkick chargers with Bluetooth connector (Linux only, not supported on Docker)
 - `nrgkick-connect`: NRGkick chargers with additional NRGkick Connect module
-- `openWB`: openWB chargers using openWB's MQTT interface
+- `openWB`: openWB chargers using openWB's MQTT interface (set `phases: true` to indicate if openWB is equipped with 1p3p capability- currently this cannot be auto detected)
 - `phoenix-em-eth`: chargers with Phoenix **EM**-CP-PP-**ETH** controllers
 - `phoenix-ev-eth`: chargers with Phoenix **EV**-CC-\*\*\*-**ETH** controllers (see [Preparation](#phoenix-emev-ethernet-controller-preparation-))
 - `phoenix-ev-ser`: chargers with Phoenix **EV**-CC-\*\*\*-**SER** serial controllers (Modbus RTU)
@@ -199,6 +199,7 @@ Available charger implementations are:
 - `custom`: default charger implementation using configurable [plugins](#plugins) for integrating any type of charger
 
 Smart-Home outlet charger implementations:
+
 - `fritzdect`: Fritz!DECT 200/210 outlets
 - `shelly`: Shelly outlets
 - `tasmota`: Tasmota outlets
