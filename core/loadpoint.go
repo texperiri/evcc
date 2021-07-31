@@ -969,6 +969,16 @@ func (lp *LoadPoint) updateChargeCurrents() {
 	lp.chargeCurrents = nil
 	phaseMeter, ok := lp.chargeMeter.(api.MeterCurrent)
 	if !ok {
+		// guess active phases from power consumption
+		// assumes that chargePower has been updated before
+		if lp.charging() && lp.chargeCurrent > 0 {
+			activePhases := int64(math.Round(lp.chargePower / Voltage / lp.chargeCurrent))
+			if activePhases >= 1 && activePhases <= 3 {
+				lp.activePhases = activePhases
+				lp.publish("activePhases", activePhases)
+			}
+		}
+
 		return
 	}
 
