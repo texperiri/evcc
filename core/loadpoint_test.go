@@ -295,12 +295,13 @@ func TestPVHysteresis(t *testing.T) {
 
 			Voltage = 100
 			lp := &LoadPoint{
-				log:        util.NewLogger("foo"),
-				clock:      clck,
-				charger:    charger,
-				MinCurrent: minA,
-				MaxCurrent: maxA,
-				Phases:     10,
+				log:          util.NewLogger("foo"),
+				clock:        clck,
+				charger:      charger,
+				MinCurrent:   minA,
+				MaxCurrent:   maxA,
+				Phases:       10,
+				activePhases: 10,
 				Enable: ThresholdConfig{
 					Threshold: tc.enable,
 					Delay:     dt,
@@ -341,11 +342,12 @@ func TestPVHysteresisForStatusOtherThanC(t *testing.T) {
 
 	Voltage = 100
 	lp := &LoadPoint{
-		log:        util.NewLogger("foo"),
-		clock:      clck,
-		MinCurrent: minA,
-		MaxCurrent: maxA,
-		Phases:     10,
+		log:          util.NewLogger("foo"),
+		clock:        clck,
+		MinCurrent:   minA,
+		MaxCurrent:   maxA,
+		Phases:       10,
+		activePhases: 10,
 	}
 
 	// not connected, test PV mode logic  short-circuited
