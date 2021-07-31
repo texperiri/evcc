@@ -796,14 +796,14 @@ func TestScalePhases(t *testing.T) {
 		}},
 
 		// omit to switch down from 3p/1p configured/active
-		{"3/1->3, not enough power", 3, 1, 0, 3, false, nil},
-		{"3/1->3, kickoff", 3, 1, 1 * Voltage * minA, 3, false, func(lp *LoadPoint) {
+		{"3/1->1, not enough power", 3, 1, 0, 3, false, nil},
+		{"3/1->1, kickoff", 3, 1, 1 * Voltage * minA, 3, false, func(lp *LoadPoint) {
 			lp.phaseTimer = time.Time{}
 		}},
-		{"3/1->3, timer running", 3, 1, 1 * Voltage * minA, 3, false, func(lp *LoadPoint) {
+		{"3/1->1, timer running", 3, 1, 1 * Voltage * minA, 3, false, func(lp *LoadPoint) {
 			lp.phaseTimer = lp.clock.Now()
 		}},
-		{"3/1->3, timer elapsed", 3, 1, 1 * Voltage * minA, 3, false, func(lp *LoadPoint) {
+		{"3/1->1, timer elapsed", 3, 1, 1 * Voltage * minA, 3, false, func(lp *LoadPoint) {
 			lp.phaseTimer = lp.clock.Now().Add(-dt)
 		}},
 
@@ -849,8 +849,7 @@ func TestScalePhases(t *testing.T) {
 			charger.MockChargePhases.EXPECT().Phases1p3p(tc.toPhases).Return(nil)
 		}
 
-		targetCurrent := tc.availablePower / Voltage / float64(tc.activePhases)
-		if res := lp.pvScaleActive(tc.availablePower, targetCurrent, minA, maxA); tc.res != res {
+		if res := lp.pvScaleActive(tc.availablePower, minA, maxA); tc.res != res {
 			t.Errorf("expected %v, got %v", tc.res, res)
 		} else {
 			if lp.Phases != int64(tc.toPhases) {
