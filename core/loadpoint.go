@@ -805,8 +805,8 @@ func (lp *LoadPoint) scalePhases(phases int, availablePower float64) error {
 	return nil
 }
 
-// pvScaleActive switches phases if necessary and returns true in this case
-func (lp *LoadPoint) pvScaleActive(availablePower, minCurrent, maxCurrent float64) bool {
+// pvScalePhases switches phases if necessary and returns if switch occured
+func (lp *LoadPoint) pvScalePhases(availablePower, minCurrent, maxCurrent float64) bool {
 	var waiting bool
 	targetCurrent := availablePower / Voltage / float64(lp.activePhases)
 
@@ -881,7 +881,7 @@ func (lp *LoadPoint) pvMaxCurrent(mode api.ChargeMode, sitePower float64) float6
 		availablePower := -sitePower + lp.chargePower
 
 		// in case of scaling, keep charger disabled for this cycle
-		if lp.pvScaleActive(availablePower, minCurrent, maxCurrent) {
+		if lp.pvScalePhases(availablePower, minCurrent, maxCurrent) {
 			return 0
 		}
 	}
