@@ -817,62 +817,62 @@ func (lp *LoadPoint) pvMaxCurrent(mode api.ChargeMode, sitePower float64) float6
 
 	lp.log.DEBUG.Printf("max charge current: %.1fA = %.1fA + %.1fA (%.0fW @ %dp)", targetCurrent, effectiveCurrent, deltaCurrent, sitePower, lp.activePhases)
 
-	// // scale phases up/down
-	// if _, ok := lp.charger.(api.ChargePhases); ok {
-	// 	availablePower := -sitePower + lp.chargePower
+	// scale phases up/down
+	if _, ok := lp.charger.(api.ChargePhases); ok {
+		availablePower := -sitePower + lp.chargePower
 
-	// 	var scaleActive bool
+		var scaleActive bool
 
-	// 	// scale down phases
-	// 	if targetCurrent < minCurrent && lp.activePhases > 1 {
-	// 		lp.log.DEBUG.Printf("available power below %dp min threshold of %.0fW", lp.activePhases, float64(lp.activePhases)*Voltage*minCurrent)
+		// scale down phases
+		if targetCurrent < minCurrent && lp.activePhases > 1 {
+			lp.log.DEBUG.Printf("available power below %dp min threshold of %.0fW", lp.activePhases, float64(lp.activePhases)*Voltage*minCurrent)
 
-	// 		if lp.phaseTimer.IsZero() {
-	// 			lp.log.DEBUG.Printf("start phase disable timer: %v", lp.Disable.Delay)
-	// 			lp.phaseTimer = lp.clock.Now()
-	// 		}
+			if lp.phaseTimer.IsZero() {
+				lp.log.DEBUG.Printf("start phase disable timer: %v", lp.Disable.Delay)
+				lp.phaseTimer = lp.clock.Now()
+			}
 
-	// 		elapsed := lp.clock.Since(lp.phaseTimer)
-	// 		if elapsed >= lp.Disable.Delay {
-	// 			lp.log.DEBUG.Println("phase disable timer elapsed")
-	// 			if err := lp.scalePhases(1, availablePower); err != nil {
-	// 				lp.log.ERROR.Printf("scale phases: %v", err)
-	// 			}
-	// 			return targetCurrent
-	// 		}
+			elapsed := lp.clock.Since(lp.phaseTimer)
+			if elapsed >= lp.Disable.Delay {
+				lp.log.DEBUG.Println("phase disable timer elapsed")
+				if err := lp.scalePhases(1, availablePower); err != nil {
+					lp.log.ERROR.Printf("scale phases: %v", err)
+				}
+				return targetCurrent
+			}
 
-	// 		scaleActive = true
-	// 		lp.log.DEBUG.Printf("phase disable timer remaining: %v", (lp.Disable.Delay - elapsed).Round(time.Second))
-	// 	}
+			scaleActive = true
+			lp.log.DEBUG.Printf("phase disable timer remaining: %v", (lp.Disable.Delay - elapsed).Round(time.Second))
+		}
 
-	// 	// scale up phases
-	// 	if min3pCurrent := powerToCurrent(-sitePower+lp.chargePower, 3); min3pCurrent >= minCurrent && lp.Phases == 1 {
-	// 		lp.log.DEBUG.Printf("available power above 3p min threshold of %.0fW", 3*Voltage*minCurrent)
+		// scale up phases
+		if min3pCurrent := powerToCurrent(-sitePower+lp.chargePower, 3); min3pCurrent >= minCurrent && lp.Phases == 1 {
+			lp.log.DEBUG.Printf("available power above 3p min threshold of %.0fW", 3*Voltage*minCurrent)
 
-	// 		if lp.phaseTimer.IsZero() {
-	// 			lp.log.DEBUG.Printf("start phase enable timer: %v", lp.Enable.Delay)
-	// 			lp.phaseTimer = lp.clock.Now()
-	// 		}
+			if lp.phaseTimer.IsZero() {
+				lp.log.DEBUG.Printf("start phase enable timer: %v", lp.Enable.Delay)
+				lp.phaseTimer = lp.clock.Now()
+			}
 
-	// 		elapsed := lp.clock.Since(lp.phaseTimer)
-	// 		if elapsed >= lp.Disable.Delay {
-	// 			lp.log.DEBUG.Println("phase enable timer elapsed")
-	// 			if err := lp.scalePhases(3, availablePower); err != nil {
-	// 				lp.log.ERROR.Printf("scale phases: %v", err)
-	// 			}
-	// 			return targetCurrent
-	// 		}
+			elapsed := lp.clock.Since(lp.phaseTimer)
+			if elapsed >= lp.Disable.Delay {
+				lp.log.DEBUG.Println("phase enable timer elapsed")
+				if err := lp.scalePhases(3, availablePower); err != nil {
+					lp.log.ERROR.Printf("scale phases: %v", err)
+				}
+				return targetCurrent
+			}
 
-	// 		scaleActive = true
-	// 		lp.log.DEBUG.Printf("phase enable timer remaining: %v", (lp.Disable.Delay - elapsed).Round(time.Second))
-	// 	}
+			scaleActive = true
+			lp.log.DEBUG.Printf("phase enable timer remaining: %v", (lp.Disable.Delay - elapsed).Round(time.Second))
+		}
 
-	// 	// reset timer to disabled state
-	// 	if !scaleActive && !lp.phaseTimer.IsZero() {
-	// 		lp.log.DEBUG.Printf("phase timer reset")
-	// 		lp.phaseTimer = time.Time{}
-	// 	}
-	// }
+		// reset timer to disabled state
+		if !scaleActive && !lp.phaseTimer.IsZero() {
+			lp.log.DEBUG.Printf("phase timer reset")
+			lp.phaseTimer = time.Time{}
+		}
+	}
 
 	// in MinPV mode return at least minCurrent
 	if mode == api.ModeMinPV && targetCurrent < minCurrent {
