@@ -768,44 +768,40 @@ func (lp *LoadPoint) effectiveCurrent() float64 {
 
 // elapsePVTimer puts the pv enable/disable timer into elapsed state
 func (lp *LoadPoint) elapsePVTimer() {
-	lp.pvTimer = time.Now().Add(-lp.Disable.Delay)
-	lp.guardUpdated = time.Now().Add(-lp.GuardDuration)
+	lp.pvTimer = lp.clock.Now().Add(-lp.Disable.Delay)
+	lp.guardUpdated = lp.clock.Now().Add(-lp.GuardDuration)
 }
 
 // scalePhases adjusts the number of active phases and returns the appropriate charging current
-func (lp *LoadPoint) scalePhases(phases int, availablePower float64) float64 {
+func (lp *LoadPoint) scalePhases(phases int, availablePower float64) error {
 	if phases != 1 && phases != 3 {
-		return 0
+		return fmt.Errorf("invalid number of phases: %d", phases)
 	}
 
 	// disable charger - this will also stop the car charging using the api if available
 	if err := lp.setLimit(0, true); err != nil {
-		lp.log.ERROR.Println(err)
-		return powerToCurrent(availablePower, lp.activePhases)
+		return err
 	}
 
 	if cp, ok := lp.charger.(api.ChargePhases); lp.Phases != int64(phases) && ok {
-		if err := cp.Phases1p3p(phases); err == nil {
-			lp.Phases = int64(phases)
-			lp.publish("phases", lp.Phases)
-
-			targetCurrent := powerToCurrent(availablePower, int64(phases))
-			lp.log.INFO.Printf("switched phases to %d, max charge current: %.1fA for available power %.fW", phases, targetCurrent, availablePower)
-
-			// disable phase timer
-			lp.phaseTimer = time.Time{}
-
-			// allow pv mode to re-enable charger right away
-			lp.elapsePVTimer()
-
-			return targetCurrent
-		} else {
-			lp.log.ERROR.Printf("switching phases to %d: %v", phases, err)
+		if err := cp.Phases1p3p(phases); err != nil {
+			return err
 		}
+
+		lp.Phases = int64(phases)
+		lp.publish("phases", lp.Phases)
+
+		targetCurrent := powerToCurrent(availablePower, int64(phases))
+		lp.log.INFO.Printf("switched phases to %d, max charge current: %.1fA for available power %.fW", phases, targetCurrent, availablePower)
+
+		// disable phase timer
+		lp.phaseTimer = time.Time{}
+
+		// allow pv mode to re-enable charger right away
+		lp.elapsePVTimer()
 	}
 
-	// continue with currently active phases
-	return powerToCurrent(availablePower, lp.activePhases)
+	return nil
 }
 
 // pvMaxCurrent calculates the maximum target current for PV mode
@@ -839,7 +835,10 @@ func (lp *LoadPoint) pvMaxCurrent(mode api.ChargeMode, sitePower float64) float6
 			elapsed := lp.clock.Since(lp.phaseTimer)
 			if elapsed >= lp.Disable.Delay {
 				lp.log.DEBUG.Println("phase disable timer elapsed")
-				return lp.scalePhases(1, availablePower)
+				if err := lp.scalePhases(1, availablePower); err != nil {
+					lp.log.ERROR.Printf("scale phases: %v", err)
+				}
+				return targetCurrent
 			}
 
 			scaleActive = true
@@ -858,7 +857,10 @@ func (lp *LoadPoint) pvMaxCurrent(mode api.ChargeMode, sitePower float64) float6
 			elapsed := lp.clock.Since(lp.phaseTimer)
 			if elapsed >= lp.Disable.Delay {
 				lp.log.DEBUG.Println("phase enable timer elapsed")
-				return lp.scalePhases(3, availablePower)
+				if err := lp.scalePhases(3, availablePower); err != nil {
+					lp.log.ERROR.Printf("scale phases: %v", err)
+				}
+				return targetCurrent
 			}
 
 			scaleActive = true
@@ -1164,13 +1166,17 @@ func (lp *LoadPoint) Update(sitePower float64, cheap bool) {
 		err = lp.setLimit(0, true)
 
 	case lp.minSocNotReached():
-		_ = lp.scalePhases(3, 0) // 3p if available
-		err = lp.setLimit(lp.GetMaxCurrent(), true)
+		// 3p if available
+		if err = lp.scalePhases(3, 0); err == nil {
+			err = lp.setLimit(lp.GetMaxCurrent(), true)
+		}
 		lp.elapsePVTimer() // let PV mode disable immediately afterwards
 
 	case mode == api.ModeNow:
-		_ = lp.scalePhases(3, 0) // 3p if available
-		err = lp.setLimit(lp.GetMaxCurrent(), true)
+		// 3p if available
+		if err = lp.scalePhases(3, 0); err == nil {
+			err = lp.setLimit(lp.GetMaxCurrent(), true)
+		}
 
 	// target charging
 	case lp.socTimer.StartRequired():
