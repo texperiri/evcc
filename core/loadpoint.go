@@ -78,7 +78,7 @@ type LoadPoint struct {
 	Mode       api.ChargeMode `mapstructure:"mode"` // Charge mode, guarded by mutex
 
 	Title       string   `mapstructure:"title"`    // UI title
-	Phases      int64    `mapstructure:"phases"`   // Charger enabled phases- required for converting power and current
+	Phases      int64    `mapstructure:"phases"`   // Charger enabled phases
 	ChargerRef  string   `mapstructure:"charger"`  // Charger reference
 	VehicleRef  string   `mapstructure:"vehicle"`  // Vehicle reference
 	VehiclesRef []string `mapstructure:"vehicles"` // Vehicles reference
