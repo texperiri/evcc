@@ -849,7 +849,7 @@ func TestScalePhases(t *testing.T) {
 			charger.MockChargePhases.EXPECT().Phases1p3p(tc.toPhases).Return(nil)
 		}
 
-		if res := lp.pvScaleActive(tc.availablePower, minA, maxA); tc.res != res {
+		if res := lp.pvScalePhases(tc.availablePower, minA, maxA); tc.res != res {
 			t.Errorf("expected %v, got %v", tc.res, res)
 		} else {
 			if lp.Phases != int64(tc.toPhases) {
