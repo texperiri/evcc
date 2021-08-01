@@ -793,7 +793,10 @@ func (lp *LoadPoint) scalePhases(phases int) error {
 		return api.ErrNotAvailable
 	}
 
+	lp.Lock()
 	if lp.Phases != int64(phases) {
+		lp.Unlock()
+
 		// disable charger - this will also stop the car charging using the api if available
 		if err := lp.setLimit(0, true); err != nil {
 			return err
@@ -804,6 +807,7 @@ func (lp *LoadPoint) scalePhases(phases int) error {
 			return fmt.Errorf("switch phases: %w", err)
 		}
 
+		lp.Lock()
 		lp.Phases = int64(phases)
 		lp.publish("phases", lp.Phases)
 
@@ -813,6 +817,7 @@ func (lp *LoadPoint) scalePhases(phases int) error {
 		// allow pv mode to re-enable charger right away
 		lp.elapsePVTimer()
 	}
+	lp.Unlock()
 
 	return nil
 }
@@ -847,7 +852,7 @@ func (lp *LoadPoint) pvScalePhases(availablePower, minCurrent, maxCurrent float6
 	}
 
 	// scale up phases
-	if min3pCurrent := powerToCurrent(availablePower, 3); min3pCurrent >= minCurrent && lp.Phases == 1 {
+	if min3pCurrent := powerToCurrent(availablePower, 3); min3pCurrent >= minCurrent && lp.GetPhases() == 1 {
 		lp.log.DEBUG.Printf("available power above 3p min threshold of %.0fW", 3*Voltage*minCurrent)
 
 		if lp.phaseTimer.IsZero() {
