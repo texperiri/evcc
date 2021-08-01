@@ -773,7 +773,7 @@ func (lp *LoadPoint) elapsePVTimer() {
 }
 
 // scalePhases adjusts the number of active phases and returns the appropriate charging current
-func (lp *LoadPoint) scalePhases(phases int, availablePower float64) error {
+func (lp *LoadPoint) scalePhases(phases int) error {
 	if phases != 1 && phases != 3 {
 		return fmt.Errorf("invalid number of phases: %d", phases)
 	}
@@ -791,9 +791,6 @@ func (lp *LoadPoint) scalePhases(phases int, availablePower float64) error {
 
 		lp.Phases = int64(phases)
 		lp.publish("phases", lp.Phases)
-
-		targetCurrent := powerToCurrent(availablePower, int64(phases))
-		lp.log.INFO.Printf("switched phases to %d, max charge current: %.1fA for available power %.fW", phases, targetCurrent, availablePower)
 
 		// disable phase timer
 		lp.phaseTimer = time.Time{}
@@ -822,10 +819,12 @@ func (lp *LoadPoint) pvScalePhases(availablePower, minCurrent, maxCurrent float6
 		elapsed := lp.clock.Since(lp.phaseTimer)
 		if elapsed >= lp.Disable.Delay {
 			lp.log.DEBUG.Println("phase disable timer elapsed")
-			if err := lp.scalePhases(1, availablePower); err != nil {
+			if err := lp.scalePhases(1); err == nil {
+				lp.log.DEBUG.Printf("scaled phases: 1p @ %.0fW", availablePower)
+				return true
+			} else {
 				lp.log.ERROR.Printf("scale phases: %v", err)
 			}
-			return true
 		}
 
 		waiting = true
@@ -844,10 +843,12 @@ func (lp *LoadPoint) pvScalePhases(availablePower, minCurrent, maxCurrent float6
 		elapsed := lp.clock.Since(lp.phaseTimer)
 		if elapsed >= lp.Disable.Delay {
 			lp.log.DEBUG.Println("phase enable timer elapsed")
-			if err := lp.scalePhases(3, availablePower); err != nil {
+			if err := lp.scalePhases(3); err == nil {
+				lp.log.DEBUG.Printf("scaled phases: 3p @ %.0fW", availablePower)
+				return true
+			} else {
 				lp.log.ERROR.Printf("scale phases: %v", err)
 			}
-			return true
 		}
 
 		waiting = true
@@ -1179,14 +1180,14 @@ func (lp *LoadPoint) Update(sitePower float64, cheap bool) {
 
 	case lp.minSocNotReached():
 		// 3p if available
-		if err = lp.scalePhases(3, 0); err == nil {
+		if err = lp.scalePhases(3); err == nil {
 			err = lp.setLimit(lp.GetMaxCurrent(), true)
 		}
 		lp.elapsePVTimer() // let PV mode disable immediately afterwards
 
 	case mode == api.ModeNow:
 		// 3p if available
-		if err = lp.scalePhases(3, 0); err == nil {
+		if err = lp.scalePhases(3); err == nil {
 			err = lp.setLimit(lp.GetMaxCurrent(), true)
 		}
 
