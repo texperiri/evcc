@@ -772,13 +772,28 @@ func (lp *LoadPoint) elapsePVTimer() {
 	lp.guardUpdated = lp.clock.Now().Add(-lp.GuardDuration)
 }
 
-// scalePhases adjusts the number of active phases and returns the appropriate charging current
+// scalePhasesIfAvailable scales if api.ChargePhases is available
+func (lp *LoadPoint) scalePhasesIfAvailable(phases int) error {
+	err := lp.scalePhases(phases)
+	if errors.Is(err, api.ErrNotAvailable) {
+		return nil
+	}
+	return err
+}
+
+// scalePhases adjusts the number of active phases and returns the appropriate charging current.
+// Returns api.ErrNotAvailable if api.ChargePhases is not available.
 func (lp *LoadPoint) scalePhases(phases int) error {
 	if phases != 1 && phases != 3 {
 		return fmt.Errorf("invalid number of phases: %d", phases)
 	}
 
-	if cp, ok := lp.charger.(api.ChargePhases); lp.Phases != int64(phases) && ok {
+	cp, ok := lp.charger.(api.ChargePhases)
+	if !ok {
+		return api.ErrNotAvailable
+	}
+
+	if lp.Phases != int64(phases) {
 		// disable charger - this will also stop the car charging using the api if available
 		if err := lp.setLimit(0, true); err != nil {
 			return err
@@ -1180,14 +1195,14 @@ func (lp *LoadPoint) Update(sitePower float64, cheap bool) {
 
 	case lp.minSocNotReached():
 		// 3p if available
-		if err = lp.scalePhases(3); err == nil {
+		if err = lp.scalePhasesIfAvailable(3); err == nil {
 			err = lp.setLimit(lp.GetMaxCurrent(), true)
 		}
 		lp.elapsePVTimer() // let PV mode disable immediately afterwards
 
 	case mode == api.ModeNow:
 		// 3p if available
-		if err = lp.scalePhases(3); err == nil {
+		if err = lp.scalePhasesIfAvailable(3); err == nil {
 			err = lp.setLimit(lp.GetMaxCurrent(), true)
 		}
 
