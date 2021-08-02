@@ -818,6 +818,9 @@ func TestScalePhases(t *testing.T) {
 		{"3/3->1, timer elapsed", 3, 3, 1 * Voltage * maxA, 1, true, func(lp *LoadPoint) {
 			lp.phaseTimer = lp.clock.Now().Add(-dt)
 		}},
+		{"3/3->1, switch executed", 1, 3, 1 * Voltage * maxA, 1, false, func(lp *LoadPoint) {
+			lp.phaseTimer = lp.clock.Now().Add(-dt)
+		}},
 	}
 
 	for _, tc := range tc {

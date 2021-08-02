@@ -825,10 +825,12 @@ func (lp *LoadPoint) scalePhases(phases int) error {
 // pvScalePhases switches phases if necessary and returns if switch occured
 func (lp *LoadPoint) pvScalePhases(availablePower, minCurrent, maxCurrent float64) bool {
 	var waiting bool
+
+	phases := lp.GetPhases()
 	targetCurrent := availablePower / Voltage / float64(lp.activePhases)
 
 	// scale down phases
-	if targetCurrent < minCurrent && lp.activePhases > 1 {
+	if targetCurrent < minCurrent && phases > 1 && lp.activePhases > 1 {
 		lp.log.DEBUG.Printf("available power below %dp min threshold of %.0fW", lp.activePhases, float64(lp.activePhases)*Voltage*minCurrent)
 
 		if lp.phaseTimer.IsZero() {
@@ -852,7 +854,7 @@ func (lp *LoadPoint) pvScalePhases(availablePower, minCurrent, maxCurrent float6
 	}
 
 	// scale up phases
-	if min3pCurrent := powerToCurrent(availablePower, 3); min3pCurrent >= minCurrent && lp.GetPhases() == 1 {
+	if min3pCurrent := powerToCurrent(availablePower, 3); min3pCurrent >= minCurrent && phases == 1 {
 		lp.log.DEBUG.Printf("available power above 3p min threshold of %.0fW", 3*Voltage*minCurrent)
 
 		if lp.phaseTimer.IsZero() {
