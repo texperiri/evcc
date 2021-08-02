@@ -18,17 +18,17 @@ import (
 // Easee charger implementation
 type Easee struct {
 	*request.Helper
-	charger           string
-	site, circuit     int
-	status            easee.ChargerStatus
-	updated           time.Time
-	cache             time.Duration
-	lp                core.LoadPointAPI
-	lastSmartCharging bool
-	lastChargeMode    api.ChargeMode
-	log               *util.Logger
-	phases            int
-	current           float64
+	charger       string
+	site, circuit int
+	status        easee.ChargerStatus
+	updated       time.Time
+	cache         time.Duration
+	lp            core.LoadPointAPI
+	//lastSmartCharging bool
+	//lastChargeMode api.ChargeMode
+	log     *util.Logger
+	phases  int
+	current float64
 }
 
 func init() {
@@ -132,6 +132,7 @@ func (c *Easee) chargerDetails() (res easee.Site, err error) {
 	return res, err
 }
 
+/*
 func (c *Easee) syncSmartCharging() error {
 	if c.lp == nil {
 		return nil
@@ -172,6 +173,7 @@ func (c *Easee) syncSmartCharging() error {
 	}
 	return nil
 }
+*/
 
 func (c *Easee) state() (easee.ChargerStatus, error) {
 	if time.Since(c.updated) < c.cache {
