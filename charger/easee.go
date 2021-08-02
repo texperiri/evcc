@@ -182,7 +182,7 @@ func (c *Easee) state() (easee.ChargerStatus, error) {
 	req, err := request.New(http.MethodGet, uri, nil, request.JSONEncoding)
 	if err == nil {
 		if err = c.DoJSON(req, &c.status); err == nil {
-			err = c.syncSmartCharging()
+			// err = c.syncSmartCharging()
 			c.updated = time.Now()
 		}
 	}
