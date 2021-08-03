@@ -829,7 +829,12 @@ func (lp *LoadPoint) pvScalePhases(availablePower, minCurrent, maxCurrent float6
 	phases := lp.GetPhases()
 	targetCurrent := availablePower / Voltage / float64(lp.activePhases)
 
-	lp.log.DEBUG.Printf("pvScalePhases available power %.0f for target current %.1f @ %dp/%dp", availablePower, targetCurrent, lp.activePhases, phases)
+	lp.log.DEBUG.Printf("!!pvScalePhases available power %.0f for target current %.1f @ %dp/%dp", availablePower, targetCurrent, lp.activePhases, phases)
+	if lp.phaseTimer.IsZero() {
+		lp.log.DEBUG.Printf("!!pvScalePhases timer empty")
+	} else {
+		lp.log.DEBUG.Printf("!!pvScalePhases timer remaining: %v", lp.clock.Since(lp.phaseTimer).Truncate(time.Second))
+	}
 
 	// scale down phases
 	if targetCurrent < minCurrent && phases > 1 && lp.activePhases > 1 {
@@ -844,10 +849,10 @@ func (lp *LoadPoint) pvScalePhases(availablePower, minCurrent, maxCurrent float6
 		if elapsed >= lp.Disable.Delay {
 			lp.log.DEBUG.Println("phase disable timer elapsed")
 			if err := lp.scalePhases(1); err == nil {
-				lp.log.DEBUG.Printf("scaled phases: 1p @ %.0fW", availablePower)
+				lp.log.DEBUG.Printf("switched phases: 1p @ %.0fW", availablePower)
 				return true
 			} else {
-				lp.log.ERROR.Printf("scale phases: %v", err)
+				lp.log.ERROR.Printf("switch phases: %v", err)
 			}
 		}
 
@@ -868,10 +873,10 @@ func (lp *LoadPoint) pvScalePhases(availablePower, minCurrent, maxCurrent float6
 		if elapsed >= lp.Disable.Delay {
 			lp.log.DEBUG.Println("phase enable timer elapsed")
 			if err := lp.scalePhases(3); err == nil {
-				lp.log.DEBUG.Printf("scaled phases: 3p @ %.0fW", availablePower)
+				lp.log.DEBUG.Printf("switched phases: 3p @ %.0fW", availablePower)
 				return true
 			} else {
-				lp.log.ERROR.Printf("scale phases: %v", err)
+				lp.log.ERROR.Printf("switch phases: %v", err)
 			}
 		}
 
@@ -901,7 +906,7 @@ func (lp *LoadPoint) pvMaxCurrent(mode api.ChargeMode, sitePower float64) float6
 
 	lp.log.DEBUG.Printf("max charge current: %.1fA = %.1fA + %.1fA (%.0fW @ %dp)", targetCurrent, effectiveCurrent, deltaCurrent, sitePower, lp.activePhases)
 
-	// scale phases up/down
+	// switch phases up/down
 	if _, ok := lp.charger.(api.ChargePhases); ok {
 		availablePower := -sitePower + lp.chargePower
 
