@@ -95,13 +95,14 @@ type LoadPoint struct {
 	sync.Mutex                // guard status
 	Mode       api.ChargeMode `mapstructure:"mode"` // Charge mode, guarded by mutex
 
-	Title       string   `mapstructure:"title"`    // UI title
-	Phases      int      `mapstructure:"phases"`   // Charger enabled phases
-	ChargerRef  string   `mapstructure:"charger"`  // Charger reference
-	VehicleRef  string   `mapstructure:"vehicle"`  // Vehicle reference
-	VehiclesRef []string `mapstructure:"vehicles"` // Vehicles reference
-	MeterRef    string   `mapstructure:"meter"`    // Charge meter reference
-	Meters      struct {
+	Title         string   `mapstructure:"title"`      // UI title
+	Phases        int      `mapstructure:"phases"`     // Charger enabled phases
+	ChargerRef    string   `mapstructure:"charger"`    // Charger reference
+	Switch1p3pRef string   `mapstructure:"switch1p3p"` // 1p3p switch reference
+	VehicleRef    string   `mapstructure:"vehicle"`    // Vehicle reference
+	VehiclesRef   []string `mapstructure:"vehicles"`   // Vehicles reference
+	MeterRef      string   `mapstructure:"meter"`      // Charge meter reference
+	Meters        struct {
 		ChargeMeterRef string `mapstructure:"charge"` // deprecated
 	}
 	SoC               SoCConfig
@@ -127,6 +128,7 @@ type LoadPoint struct {
 	charger     api.Charger
 	chargeTimer api.ChargeTimer
 	chargeRater api.ChargeRater
+	switch1p3p  api.ChargePhases // 1p3p switch interface
 
 	chargeMeter  api.Meter     // Charger usage meter
 	vehicle      api.Vehicle   // Currently active vehicle
@@ -234,8 +236,17 @@ func NewLoadPointFromConfig(log *util.Logger, cp configProvider, other map[strin
 	lp.charger = cp.Charger(lp.ChargerRef)
 	lp.configureChargerType(lp.charger)
 
+	// check if 1p3p switching is supported/configured
+	if lp.Switch1p3pRef != "" {
+		lp.switch1p3p = cp.Switch1p3p(lp.Switch1p3pRef)
+	} else if _, ok := lp.charger.(api.ChargePhases); ok {
+		lp.switch1p3p = lp.charger.(api.ChargePhases)
+	} else {
+		lp.switch1p3p = nil
+	}
+
 	// ensure 1p setup for switchable charger (https://github.com/evcc-io/evcc/issues/1572)
-	if _, ok := lp.charger.(api.ChargePhases); ok && lp.Phases != 0 {
+	if lp.switch1p3p != nil && lp.Phases != 0 {
 		lp.log.WARN.Printf("ignoring phases config (%dp) for switchable charger", lp.Phases)
 		lp.setPhases(0)
 	}
@@ -993,8 +1004,7 @@ func (lp *LoadPoint) scalePhases(phases int) error {
 		return fmt.Errorf("invalid number of phases: %d", phases)
 	}
 
-	cp, ok := lp.charger.(api.ChargePhases)
-	if !ok {
+	if lp.switch1p3p == nil {
 		return api.ErrNotAvailable
 	}
 
@@ -1005,7 +1015,7 @@ func (lp *LoadPoint) scalePhases(phases int) error {
 		}
 
 		// switch phases
-		if err := cp.Phases1p3p(phases); err != nil {
+		if err := lp.switch1p3p.Phases1p3p(phases); err != nil {
 			return fmt.Errorf("switch phases: %w", err)
 		}
 
@@ -1132,7 +1142,7 @@ func (lp *LoadPoint) pvMaxCurrent(mode api.ChargeMode, sitePower float64, batter
 	lp.log.DEBUG.Printf("max charge current: %.3gA = %.3gA + %.3gA (%.0fW @ %dp)", targetCurrent, effectiveCurrent, deltaCurrent, sitePower, lp.activePhases)
 
 	// switch phases up/down
-	if _, ok := lp.charger.(api.ChargePhases); ok {
+	if lp.switch1p3p != nil {
 		availablePower := -sitePower + lp.chargePower
 
 		// in case of scaling, keep charger disabled for this cycle
