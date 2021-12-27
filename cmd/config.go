@@ -14,6 +14,7 @@ import (
 	"github.com/evcc-io/evcc/provider/mqtt"
 	"github.com/evcc-io/evcc/push"
 	"github.com/evcc-io/evcc/server"
+	simulation "github.com/evcc-io/evcc/sim"
 	"github.com/evcc-io/evcc/switch1p3p"
 	"github.com/evcc-io/evcc/util"
 	"github.com/evcc-io/evcc/vehicle"
@@ -38,6 +39,7 @@ type config struct {
 	Meters       []qualifiedConfig
 	Chargers     []qualifiedConfig
 	Switches1p3p []qualifiedConfig
+	Simulators   []qualifiedConfig
 	Vehicles     []qualifiedConfig
 	Tariffs      tariffConfig
 	Site         map[string]interface{}
@@ -85,6 +87,7 @@ type ConfigProvider struct {
 	vehicles     map[string]api.Vehicle
 	visited      map[string]bool
 	auth         *util.AuthCollection
+	simulators   map[string]api.Updateable
 }
 
 func (cp *ConfigProvider) TrackVisitors() {
@@ -135,6 +138,15 @@ func (cp *ConfigProvider) Vehicle(name string) api.Vehicle {
 	return nil
 }
 
+// Simulator provides simulators by name
+func (cp *ConfigProvider) Simulator(name string) api.Updateable {
+	if simulator, ok := cp.simulators[name]; ok {
+		return simulator
+	}
+	log.FATAL.Fatalf("invalid simulator: %s", name)
+	return nil
+}
+
 func (cp *ConfigProvider) configure(conf config) error {
 	err := cp.configureMeters(conf)
 	if err == nil {
@@ -146,6 +158,12 @@ func (cp *ConfigProvider) configure(conf config) error {
 	if err == nil {
 		err = cp.configureVehicles(conf)
 	}
+	// must be executed last in list for the simulator to get hold of all sims
+	// through the configProvider
+	if err == nil {
+		err = cp.configureSimulators(conf)
+	}
+
 	return err
 }
 
@@ -195,6 +213,29 @@ func (cp *ConfigProvider) configureChargers(conf config) error {
 	return nil
 }
 
+func (cp *ConfigProvider) configureVehicles(conf config) error {
+	cp.vehicles = make(map[string]api.Vehicle)
+	for id, cc := range conf.Vehicles {
+		if cc.Name == "" {
+			return fmt.Errorf("cannot create %s vehicle: missing name", humanize.Ordinal(id+1))
+		}
+
+		v, err := vehicle.NewFromConfig(cc.Type, cc.Other)
+		if err != nil {
+			// wrap any created errors to prevent fatals
+			v, _ = wrapper.New(v, err)
+		}
+
+		if _, exists := cp.vehicles[cc.Name]; exists {
+			return fmt.Errorf("duplicate vehicle name: %s already defined and must be unique", cc.Name)
+		}
+
+		cp.vehicles[cc.Name] = v
+	}
+
+	return nil
+}
+
 func (cp *ConfigProvider) configureSwitches1p3p(conf config) error {
 	cp.switches1p3p = make(map[string]api.ChargePhases)
 	for id, cc := range conf.Switches1p3p {
@@ -218,24 +259,31 @@ func (cp *ConfigProvider) configureSwitches1p3p(conf config) error {
 	return nil
 }
 
-func (cp *ConfigProvider) configureVehicles(conf config) error {
-	cp.vehicles = make(map[string]api.Vehicle)
-	for id, cc := range conf.Vehicles {
+func (cp *ConfigProvider) configureSimulators(conf config) error {
+	cp.simulators = make(map[string]api.Updateable)
+	for id, cc := range conf.Simulators {
 		if cc.Name == "" {
-			return fmt.Errorf("cannot create %s vehicle: missing name", humanize.Ordinal(id+1))
+			return fmt.Errorf("cannot create %s simulator: missing name", humanize.Ordinal(id+1))
 		}
 
-		v, err := vehicle.NewFromConfig(cc.Type, cc.Other)
+		actors := &simulation.Actors{
+			Meters:       cp.meters,
+			Chargers:     cp.chargers,
+			Switches1p3p: cp.switches1p3p,
+			Vehicles:     cp.vehicles,
+		}
+
+		c, err := simulation.NewFromConfig(actors, cc.Type, cc.Other)
 		if err != nil {
-			// wrap any created errors to prevent fatals
-			v, _ = wrapper.New(v, err)
+			err = fmt.Errorf("cannot create simulator '%s': %w", cc.Name, err)
+			return err
 		}
 
-		if _, exists := cp.vehicles[cc.Name]; exists {
-			return fmt.Errorf("duplicate vehicle name: %s already defined and must be unique", cc.Name)
+		if _, exists := cp.simulators[cc.Name]; exists {
+			return fmt.Errorf("duplicate simulator name: %s already defined and must be unique", cc.Name)
 		}
 
-		cp.vehicles[cc.Name] = v
+		cp.simulators[cc.Name] = c
 	}
 
 	return nil

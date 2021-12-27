@@ -203,3 +203,8 @@ type ProviderLogin interface {
 	LogoutHandler() http.HandlerFunc
 	CallbackHandler(baseURI string) http.HandlerFunc
 }
+
+// Updateable components shall be updated every site cycle
+type Updateable interface {
+	Update() error
+}
