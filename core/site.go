@@ -211,7 +211,15 @@ func (site *Site) DumpConfig() {
 			presence[phases],
 		)
 
-		lp.log.INFO.Printf("  meters:      charge %s", presence[lp.HasChargeMeter()])
+		if lp.switch1p3p != nil {
+			_, chargeEnable := lp.switch1p3p.(api.ChargeEnable)
+			lp.log.INFO.Printf("  phases:    1p3p %s enable %s",
+				presence[true],
+				presence[chargeEnable],
+			)
+		}
+
+		lp.log.INFO.Printf("  meters:    charge %s", presence[lp.HasChargeMeter()])
 
 		lp.publish("chargeConfigured", lp.HasChargeMeter())
 		if lp.HasChargeMeter() {
