@@ -88,8 +88,10 @@ func (sw *SimSwitch1p3p) UnlockPhases1p3p() error {
 // Phases1p3p sets the phases the switch should switch to
 func (sw *SimSwitch1p3p) Phases1p3p(phases int) error {
 	if sw.enabled {
+		sw.log.FATAL.Fatalf("%s: switching phases only allowed when disabled", sw.name)
 		return fmt.Errorf("%s: switching phases only allowed when disabled", sw.name)
 	}
+	sw.log.DEBUG.Printf("%s: switch phases to: %d", sw.name, phases)
 	sw.isLockTriggered = sw.isLockRequested
 	sw.phases = phases
 	return nil

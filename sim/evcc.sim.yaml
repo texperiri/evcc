@@ -92,12 +92,17 @@ simulators:
       attribute: vehicle
       value: vehicleSim
     - cmd: sleep
-      value: 30s
+      value: 20s
     - cmd: setGui
       attribute: mode
       value: now
     - cmd: sleep
-      value: 60s
+      value: 20s
+    - cmd: expect
+      object: switch1p3pSim
+      attribute: phases
+      value: 3
+      timeout: 60s
     - cmd: set
       object: switch1p3pSim
       attribute: lockPhases
@@ -114,20 +119,37 @@ simulators:
       object: switch1p3pSim
       attribute: unlockPhases
     - cmd: sleep
-      value: 20s
+      value: 30s
+    - cmd: expect
+      object: switch1p3pSim
+      attribute: phases
+      value: 1
+      timeout: 60s
     - cmd: setGui
       attribute: mode
       value: now
     - cmd: sleep
       value: 30s
+    - cmd: expect
+      object: switch1p3pSim
+      attribute: phases
+      value: 3
+      timeout: 60s
     - cmd: setGui
       attribute: mode
       value: minpv
     - cmd: sleep
       value: 30s
+    - cmd: expect
+      object: switch1p3pSim
+      attribute: phases
+      value: 1
+      timeout: 60s
     - cmd: setGui
       attribute: mode
       value: now
+    - cmd: sleep
+      value: 30s
     - cmd: expect
       object: switch1p3pSim
       attribute: phases

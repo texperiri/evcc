@@ -342,7 +342,6 @@ func (sim *Simulator) ProcessProgramStep() (bool, error) {
 
 	command := sim.cfg.Program[sim.progStep]
 	sim.log.DEBUG.Printf("TestCommand: [%d] %v", sim.progStep, command)
-
 	switch command.Cmd {
 	case "sleep":
 		sleepTime, err := time.ParseDuration(command.Value)
@@ -460,6 +459,7 @@ func (sim *Simulator) ProcessProgramStep() (bool, error) {
 			sim.progStepStart = time.Time{}
 			currentProcStep := sim.progStep
 			sim.progStep = len(sim.cfg.Program)
+			sim.log.FATAL.Fatalf("expect timeout elapsed for command[%d]. Stopping simulator program", currentProcStep)
 			return false, fmt.Errorf("expect timeout elapsed for command[%d]. Stopping simulator program", currentProcStep)
 		} else {
 			sim.log.DEBUG.Printf("expect timeout remaining:%v", (timeout - time.Since(sim.progStepStart)))
@@ -528,7 +528,7 @@ func (sim *Simulator) ProcessProgramStep() (bool, error) {
 	}
 
 	if sim.progStep >= len(sim.cfg.Program) {
-		sim.log.DEBUG.Printf("*** Program finished ***")
+		sim.log.DEBUG.Fatal("*** Program finished ***")
 		return false, nil
 	}
 
