@@ -27,9 +27,10 @@ type Com struct {
 	*request.Helper
 	uri      string // URI address of the LG ESS inverter - e.g. "https://192.168.1.28"
 	authPath string
-	password string // registration number of the LG ESS Inverter - e.g. "DE2001..."
-	authKey  string // auth_key returned during login and renewed with new login after expiration
-	dataG    func() (EssData8, error)
+	password string    // registration number of the LG ESS Inverter - e.g. "DE2001..."
+	authKey  string    // auth_key returned during login and renewed with new login after expiration
+	essType  LgEssType // currently the LG Ess Home 8/10 and Home 15 are supported
+	dataG    func() (EssData, error)
 }
 
 var (
@@ -38,7 +39,7 @@ var (
 )
 
 // GetInstance implements the singleton pattern to handle the access via the authkey to the PCS of the LG ESS HOME system
-func GetInstance(uri, registration, password string, cache time.Duration) (*Com, error) {
+func GetInstance(uri, registration, password string, cache time.Duration, essType LgEssType) (*Com, error) {
 	uri = util.DefaultScheme(strings.TrimSuffix(uri, "/"), "https")
 
 	var err error
@@ -49,6 +50,7 @@ func GetInstance(uri, registration, password string, cache time.Duration) (*Com,
 			uri:      uri,
 			authPath: UserLoginURI,
 			password: password,
+			essType:  essType,
 		}
 
 		if registration != "" {
@@ -120,53 +122,99 @@ func (m *Com) Login() error {
 }
 
 // Data gives the data read from the pcs.
-func (m *Com) Data() (EssData8, error) {
+func (m *Com) Data() (EssData, error) {
 	return m.dataG()
 }
 
 // refreshData reads data from lgess pcs. Tries to re-login if "405" auth_key expired is returned
-func (m *Com) refreshData() (EssData8, error) {
+func (m *Com) refreshData() (EssData, error) {
+	var data EssData
+	var err error
+	if m.essType == LgEss8 {
+		var meterResponse MeterResponse8
+		if err = refreshDataFromLgess[MeterResponse8](&meterResponse, m); err != nil {
+			return EssData{}, err
+		}
+		essDataFromMeterResponse8(&data, &meterResponse)
+	} else {
+		var meterResponse MeterResponse15
+		if err = refreshDataFromLgess[MeterResponse15](&meterResponse, m); err != nil {
+			return EssData{}, err
+		}
+		essDataFromMeterResponse15(&data, &meterResponse)
+	}
+
+	return data, nil
+}
+
+// read data from Lgess, reconnects if session expired
+func refreshDataFromLgess[T MeterResponse8 | MeterResponse15](meterResponse *T, m *Com) error {
 	data := map[string]interface{}{
 		"auth_key": m.authKey,
 	}
 
 	req, err := request.New(http.MethodPost, m.uri+MeterURI, request.MarshalJSON(data), request.JSONEncoding)
 	if err != nil {
-		return EssData8{}, err
+		return err
 	}
 
-	var resp MeterResponse8
-
-	if err = m.DoJSON(req, &resp); err != nil {
+	if err := m.DoJSON(req, meterResponse); err != nil {
 		// re-login if request returns 405-error
 		var se request.StatusError
 		if errors.As(err, &se) && se.StatusCode() == http.StatusMethodNotAllowed {
-			err = m.Login()
-
-			if err == nil {
-				data["auth_key"] = m.authKey
-				req, err = request.New(http.MethodPost, m.uri+MeterURI, request.MarshalJSON(data), request.JSONEncoding)
+			if err = m.Login(); err != nil {
+				return err
 			}
 
-			if err == nil {
-				err = m.DoJSON(req, &resp)
+			data["auth_key"] = m.authKey
+			if req, err = request.New(http.MethodPost, m.uri+MeterURI, request.MarshalJSON(data), request.JSONEncoding); err != nil {
+				return err
+			}
+
+			if err = m.DoJSON(req, meterResponse); err != nil {
+				return err
 			}
 		}
 	}
 
-	if err != nil {
-		return EssData8{}, err
-	}
+	return err
+}
 
-	res := resp.Statistics
-	if resp.Direction.IsGridSelling > 0 {
-		res.GridPower = -res.GridPower
+// convert response from LgEss8/10 into interface EssData
+func essDataFromMeterResponse8(essData *EssData, meterResponse *MeterResponse8) {
+	essData.GridPower = meterResponse.Statistics.GridPower
+	essData.PvTotalPower = meterResponse.Statistics.PvTotalPower
+	essData.BatConvPower = meterResponse.Statistics.BatConvPower
+	essData.BatUserSoc = meterResponse.Statistics.BatUserSoc
+	essData.CurrentGridFeedInEnergy = meterResponse.Statistics.CurrentGridFeedInEnergy
+	essData.CurrentPvGenerationSum = meterResponse.Statistics.CurrentPvGenerationSum
+
+	if meterResponse.Direction.IsGridSelling > 0 {
+		essData.GridPower = -essData.GridPower
 	}
 
 	// discharge battery: batPower is positive, charge battery: batPower is negative
-	if resp.Direction.IsBatteryDischarging == 0 {
-		res.BatConvPower = -res.BatConvPower
+	if meterResponse.Direction.IsBatteryDischarging == 0 {
+		essData.BatConvPower = -essData.BatConvPower
+	}
+}
+
+// convert response from LgEss15 into interface EssData
+func essDataFromMeterResponse15(essData *EssData, meterResponse *MeterResponse15) {
+	// Ess15 meter gives data in 100W units.
+	essData.GridPower = float64(meterResponse.Statistics.GridPower * 100)
+	essData.PvTotalPower = float64(meterResponse.Statistics.PvTotalPower * 100)
+	essData.BatConvPower = float64(meterResponse.Statistics.BatConvPower * 100)
+	essData.BatUserSoc = float64(meterResponse.Statistics.BatUserSoc * 100)
+	essData.CurrentGridFeedInEnergy = float64(0) // data not provided by Ess15
+	essData.CurrentPvGenerationSum = float64(0)  // data not provided by Ess15
+
+	if meterResponse.Direction.IsGridSelling > 0 {
+		essData.GridPower = -essData.GridPower
 	}
 
-	return res, nil
+	// discharge battery: batPower is positive, charge battery: batPower is negative
+	if meterResponse.Direction.IsBatteryDischarging == 0 {
+		essData.BatConvPower = -essData.BatConvPower
+	}
 }

@@ -1,11 +1,29 @@
 package lgpcs
 
+// LgEssTypes
+type LgEssType int64
+
+const (
+	LgEss8  = 0 // lgess 8/10
+	LgEss15 = 1 // lgess 15
+)
+
 type MeterResponse8 struct {
 	Statistics EssData8
 	Direction  struct {
 		IsGridSelling        int `json:"is_grid_selling_,string"`
 		IsBatteryDischarging int `json:"is_battery_discharging_,string"`
 	}
+}
+
+// data in the format expected by the accessing (lgess) module
+type EssData struct {
+	GridPower               float64
+	PvTotalPower            float64
+	BatConvPower            float64
+	BatUserSoc              float64
+	CurrentGridFeedInEnergy float64
+	CurrentPvGenerationSum  float64
 }
 
 type EssData8 struct {

@@ -12,7 +12,8 @@ import (
 )
 
 /*
-This meter supports the LGESS HOME 8 and LGESS HOME 10 systems from LG with / without battery.
+This meter supports the LGESS HOME 8, LGESS HOME 10 and LGESS HOME 15 systems from LG with / without battery.
+
 
 ** Usages **
 The following usages are supported:
@@ -23,15 +24,18 @@ The following usages are supported:
 ** Example configuration **
 meters:
 - name: GridMeter
-  type: lgess
+  type: template
+  template: lg-ess-home-15
   usage: grid
   uri: https://192.168.1.23
   password: "DE200....."
 - name: PvMeter
-  type: lgess
+  type: template
+  template: lg-ess-home-15
   usage: pv
 - name: BatteryMeter
-  type: lgess
+  type: template
+  template: lg-ess-home-15
   usage: battery
 
 ** Limitations **
@@ -46,13 +50,22 @@ type LgEss struct {
 }
 
 func init() {
-	registry.Add("lgess", NewLgEssFromConfig)
+	registry.Add("lgess8", NewLgEss8FromConfig)
+	registry.Add("lgess15", NewLgEss15FromConfig)
 }
 
 //go:generate go run ../cmd/tools/decorate.go -f decorateLgEss -b *LgEss -r api.Meter -t "api.MeterEnergy,TotalEnergy,func() (float64, error)" -t "api.Battery,Soc,func() (float64, error)" -t "api.BatteryCapacity,Capacity,func() float64"
 
+func NewLgEss8FromConfig(other map[string]interface{}) (api.Meter, error) {
+	return NewLgEssFromConfig(other, lgpcs.LgEss8)
+}
+
+func NewLgEss15FromConfig(other map[string]interface{}) (api.Meter, error) {
+	return NewLgEssFromConfig(other, lgpcs.LgEss15)
+}
+
 // NewLgEssFromConfig creates an LgEss Meter from generic config
-func NewLgEssFromConfig(other map[string]interface{}) (api.Meter, error) {
+func NewLgEssFromConfig(other map[string]interface{}, essType lgpcs.LgEssType) (api.Meter, error) {
 	cc := struct {
 		capacity               `mapstructure:",squash"`
 		URI, Usage             string
@@ -70,12 +83,12 @@ func NewLgEssFromConfig(other map[string]interface{}) (api.Meter, error) {
 		return nil, errors.New("missing usage")
 	}
 
-	return NewLgEss(cc.URI, cc.Usage, cc.Registration, cc.Password, cc.Cache, cc.capacity.Decorator())
+	return NewLgEss(cc.URI, cc.Usage, cc.Registration, cc.Password, cc.Cache, cc.capacity.Decorator(), essType)
 }
 
 // NewLgEss creates an LgEss Meter
-func NewLgEss(uri, usage, registration, password string, cache time.Duration, capacity func() float64) (api.Meter, error) {
-	conn, err := lgpcs.GetInstance(uri, registration, password, cache)
+func NewLgEss(uri, usage, registration, password string, cache time.Duration, capacity func() float64, essType lgpcs.LgEssType) (api.Meter, error) {
+	conn, err := lgpcs.GetInstance(uri, registration, password, cache, essType)
 	if err != nil {
 		return nil, err
 	}
